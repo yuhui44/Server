@@ -173,6 +173,7 @@ class UserController {
   //   });
   // }
   static async reg(ctx) {
+    console.log(ctx);
     let result = await User
       .findOne({
         username: ctx.request.body.username
