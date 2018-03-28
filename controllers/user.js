@@ -2,22 +2,15 @@ const User = require('../models/user.js');
 const config = require('../configs');
 const bcrypt = require('bcrypt');
 
-// //下面这两个包用来生成时间
-// const moment = require('moment');
-// const objectIdToTimestamp = require('objectid-to-timestamp');
-
-// //用于密码加密
-// const sha1 = require('sha1');
-
 //返回数据格式
 //{ msg: '', success: boolean, data: {} }
 //注意ctx.success在条件分支语句中需要加return,不然继续往下执行
 
 //创建Token
 const jwt = require('jsonwebtoken');
-const createToken = function (user_id) {
+const createToken = user_id => {
   const token = jwt.sign({
-    user_id: user_id
+    user_id
   }, config.jwt.secret, {
       expiresIn: config.jwt.exprisesIn //过期时间设置为60妙。那么decode这个token的时候得到的过期时间为 : 创建token的时间 +　设置的值
     });
@@ -98,10 +91,11 @@ class UserController {
     } else {
       //查找不到用户
       console.log('检查到用户名不存在');
-      ctx.status = 200;
-      ctx.body = {
-        info: false
-      };
+      // ctx.status = 200;
+      // ctx.body = {
+      //   info: false
+      // };
+      ctx.throw(500, 'findUser error');
     }
 
     // let doc = await findUser(username);
@@ -172,77 +166,93 @@ class UserController {
   //     success: true
   //   });
   // }
-  static async reg(ctx) {
-    console.log(ctx);
-    let result = await User
-      .findOne({
-        username: ctx.request.body.username
-      })
-      .exec()
-      .catch(err => {
-        ctx.throw(500, 'findUser error');
-      });
-    if (result) {
-      console.log('用户名已经存在');
-      ctx.status = 200;
+
+  //注册账号
+  static async register(ctx) {
+    //如果用户名格式有误
+    if ((!/^(?!_)(?!.*?_$)[a-zA-Z0-9_\u4e00-\u9fa5]{4,20}$/.test(ctx.request.body.username)) || (/^[0-9]*$/.test(ctx.request.body.username)) || !ctx.request.body.username) {
+      ctx.status = 401;
       ctx.body = {
-        success: false
+        code: 6,
+        msg: '用户名格式有误！'
+      };
+      //如邮箱格式有误
+    } else if (!/^[a-z0-9]+([._\\-]*[a-z0-9])*@([a-z0-9]+[-a-z0-9]*[a-z0-9]+.){1,63}[a-z0-9]+$/.test(ctx.request.body.email) || !ctx.request.body.email) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '邮箱格式有误！'
+      };
+      //如果密码格式有误
+    } else if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(ctx.request.body.password) || !ctx.request.body.password) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '密码格式有误！'
       };
     } else {
-      let password = await bcrypt.hash(ctx.request.body.password, 12);
-      // await bcrypt.hash(ctx.request.body.password, 12).then ((err, hash) => {
-      //   password = hash;
-      //   console.log(hash);
-      //   console.log(password);
-      // });
-      // bcrypt.hash(ctx.request.body.password, 12, (err, hash) => {
-      //   password = hash;
-      //   console.log(hash);
-      // });
-      let user = new User({
-        username: ctx.request.body.username,
-        password, //加密
-        create_time: new Date()
-      });
-      let result = await user
-        .save()
+      //格式都正确，查看是否已存在此用户名
+      let result = await User
+        .findOne({
+          username: ctx.request.body.username,
+          isDelete: false
+        })
+        .exec()
         .catch(err => {
-          ctx.throw(500, 'findUser error');
+          ctx.throw(500, 'find username error');
         });
-      console.log('注册成功');
-      let token = createToken(result._id);
-      console.log(token);
-      ctx.status = 200;
-      ctx.cookies.set('token', token);
-      ctx.body = {
-        success: true,
-        token
-      };
+      if (result) {
+        ctx.status = 401;
+        ctx.body = {
+          code: 6,
+          msg: '用户名已被注册！'
+        };
+      } else {
+        //查看是否存在此邮箱
+        let result = await User
+          .findOne({
+            email: ctx.request.body.email,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find email error');
+          });
+        if (result) {
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '邮箱已被注册！'
+          };
+        } else {
+          //写入数据库
+          let password = await bcrypt.hash(ctx.request.body.password, 12);
+          let user = new User({
+            username: ctx.request.body.username,
+            email: ctx.request.body.email,
+            password, //加密
+            create_time: new Date()
+          });
+          let result = await user
+            .save()
+            .catch(err => {
+              ctx.throw(500, 'register user error');
+            });
+          password = null;
+          console.log('a', password);
+          console.log('b', result._id);
+          let token = createToken(result._id);
+          ctx.status = 200;
+          ctx.cookies.set('token', token);
+          ctx.body = {
+            code: 3,
+            msg: '用户注册成功！'
+          };
+        }
+      }
     }
-
-    // let doc = await findUser(user.username);
-    // if (doc) {
-    //   console.log('用户名已经存在');
-    //   ctx.status = 200;
-    //   ctx.body = {
-    //     success: false
-    //   };
-    // } else {
-    //   await new Promise((resolve, reject) => {
-    //     user.save((err) => {
-    //       if (err) {
-    //         reject(err);
-    //       }
-    //       resolve();
-    //     });
-    //   });
-    //   console.log('注册成功');
-    //   ctx.status = 200;
-    //   ctx.body = {
-    //     success: true
-    //   }
-    // }
   };
+
   //获得所有用户信息
   static async getAllUsers(ctx) {
     //查询所有用户信息

@@ -8,7 +8,9 @@ const checkToken = require('../middlewares/checkToken.js');
 const UserController = require('../controllers/user.js');
 
 router.post('/login', UserController.login);
-router.post('/register', UserController.reg);
+//用户注册 参数：code、msg、
+router.post('/register', UserController.register);
+
 
 //需要先检查权限的路由
 router.get('/user', checkToken, UserController.getAllUsers);
