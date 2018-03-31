@@ -2,20 +2,53 @@ const User = require('../models/user.js');
 const config = require('../configs');
 const bcrypt = require('bcrypt');
 
-//返回数据格式
-//{ msg: '', success: boolean, data: {} }
-//注意ctx.success在条件分支语句中需要加return,不然继续往下执行
+// 配置邮件服务器
+const nodemailer = require('nodemailer');
+let transporter = nodemailer.createTransport(config.email);
 
 //创建Token
 const jwt = require('jsonwebtoken');
 const createToken = user_id => {
-  const token = jwt.sign({
+  let token = jwt.sign({
     user_id
   }, config.jwt.secret, {
       expiresIn: config.jwt.exprisesIn //过期时间设置为60妙。那么decode这个token的时候得到的过期时间为 : 创建token的时间 +　设置的值
     });
   return token;
 };
+const createEmailToken = (decoded) => {
+  let token = jwt.sign(decoded, config.emailJwt.secret, {
+    expiresIn: config.emailJwt.exprisesIn
+  });
+  return token;
+}
+// 发送验证邮箱邮件
+const sendEmail = (ctx, email) => {
+  let link = config.checkEmailFontLink + createEmailToken({ user_id: ctx.request.user._id, email });
+  let mailOptions = {
+    from: '"知识产权交易平台" <' + config.email.auth.user + '>',
+    to: ctx.request.user.email,
+    subject: '验证邮箱邮件',
+    // text: createEmailToken(ctx.request.user._id)
+    html: '<p>点击链接验证当前邮箱：<a href="' + link + '" target="_blank">点我验证<a></p><br/><p>如果链接无法点击请手动复制以下网址在浏览器中打开：</p></br><p>' + link + '</p><br/><p>注意：链接半小时内有效。</p>'
+  };
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '邮件发送失败，请稍后重试或与管理员联系'
+      };
+      return console.log(error);
+    }
+    // console.log(info);
+  });
+  ctx.status = 200;
+  ctx.body = {
+    code: 2,
+    msg: '邮件发送成功，请尽快通过验证'
+  };
+}
 
 //数据库的操作
 //根据用户名查找用户
@@ -47,7 +80,6 @@ const delUser = function (id) {
       if (err) {
         reject(err);
       }
-      console.log('删除用户成功');
       resolve();
     });
   });
@@ -56,116 +88,180 @@ const delUser = function (id) {
 class UserController {
   //用户登录(创建token)
   static async login(ctx) {
-    //查找用户
-    let result = await User
-      .findOne({
-        username: ctx.request.body.username
-      })
-      .exec()
-      .catch(err => {
-        ctx.throw(500, 'findUser error');
-      });
-    if (result) {
-      //查找到用户
-      //校验密码
-      if (await bcrypt.compare(ctx.request.body.password, result.password)) {
-        //密码正确
-        console.log('密码正确！');
-        let token = createToken(result._id);
-        console.log(token);
-        ctx.status = 200;
-        ctx.cookies.set('token', token);
-        ctx.body = {
-          success: true,
-          username: ctx.request.body.username,
-          token //登录成功要创建一个新的token
-        };
+    //如果账号格式有误
+    //(!ctx.request.body.account || (((!/^(?!_)(?!.*?_$)[a-zA-Z0-9_\u4e00-\u9fa5]{4,20}$/.test(value)) || (/^[0-9]*$/.test(value))) && !/^[a-z0-9]+([._\\-]*[a-z0-9])*@([a-z0-9]+[-a-z0-9]*[a-z0-9]+.){1,63}[a-z0-9]+$/.test(value)))
+    if (!(ctx.request.body.account && (/^(?!_)(?!.*?_$)[a-zA-Z0-9_\u4e00-\u9fa5]{4,20}$/.test(ctx.request.body.account) && !/^[0-9]*$/.test(ctx.request.body.account) || /^[a-z0-9]+([._\\-]*[a-z0-9])*@([a-z0-9]+[-a-z0-9]*[a-z0-9]+.){1,63}[a-z0-9]+$/.test(ctx.request.body.account)))) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '账号格式有误！'
+      };
+      //如果密码格式有误
+    } else if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(ctx.request.body.password) || !ctx.request.body.password) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '密码格式有误！'
+      };
+      //格式无误，账号分类
+    } else {
+      //不包含“@”，即username
+      if (ctx.request.body.account.indexOf("@") === -1) {
+        let result = await User
+          .findOne({
+            username: ctx.request.body.account,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find username error');
+          });
+        if (!result) {
+          //查找不到用户
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '用户不存在！'
+          };
+        } else {
+          //找到用户
+          if (await bcrypt.compare(ctx.request.body.password, result.password)) {
+            //密码正确
+            let token = createToken(result._id);
+            ctx.status = 200;
+            ctx.cookies.set('token', token);
+            ctx.body = {
+              code: 2,
+              msg: '登录成功！'
+            };
+          } else {
+            //密码错误
+            ctx.status = 401;
+            ctx.body = {
+              code: 6,
+              msg: '密码错误！'
+            };
+          }
+        }
       } else {
-        //密码错误
-        console.log('密码错误!');
+        //含有“@”，即email
+        let result = await User
+          .findOne({
+            email: ctx.request.body.account,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find email error');
+          });
+        if (!result) {
+          //查找不到用户
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '邮箱未注册！'
+          };
+        } else {
+          //找到用户
+          if (await bcrypt.compare(ctx.request.body.password, result.password)) {
+            //密码正确
+            let token = createToken(result._id);
+            ctx.status = 200;
+            ctx.cookies.set('token', token);
+            ctx.body = {
+              code: 2,
+              msg: '登录成功！'
+            };
+          } else {
+            //密码错误
+            ctx.status = 401;
+            ctx.body = {
+              code: 6,
+              msg: '密码错误！'
+            };
+          }
+        }
+      }
+    }
+  };
+  //用户退出
+  static async logout(ctx) {
+    ctx.status = 200;
+    ctx.cookies.set('token', null);
+    ctx.body = {
+      code: 2,
+      msg: '退出成功！'
+    };
+  };
+  //用户基本状态查询
+  static async userStatus(ctx) {
+    //不存在token
+    if (!ctx.cookies.get('token')) {
+      ctx.status = 200;
+      ctx.body = {
+        code: 1,
+        isLogin: false,
+        msg: '未登录（不存在token）！'
+      };
+      //存在token
+    } else {
+      let decoded;
+      try {
+        decoded = jwt.verify(ctx.cookies.get('token'), config.jwt.secret);
+      } catch (err) {
+        // token不合法或过期
         ctx.status = 200;
         ctx.body = {
-          success: false
+          code: 1,
+          isLogin: false,
+          msg: '未登录（token不合法）'
         };
       }
-    } else {
-      //查找不到用户
-      console.log('检查到用户名不存在');
-      // ctx.status = 200;
-      // ctx.body = {
-      //   info: false
-      // };
-      ctx.throw(500, 'findUser error');
+      if (decoded) {
+        // token合法
+        let result = await User
+          .findOne({
+            _id: decoded.user_id,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find user_id error');
+          });
+        if (!result) {
+          //查找不到用户
+          ctx.status = 200;
+          ctx.body = {
+            code: 1,
+            isLogin: false,
+            msg: '未登录（用户不存在）'
+          };
+          //找到用户
+        } else {
+          //邮箱未验证
+          if (!result.emailConfirmation) {
+            ctx.status = 200;
+            ctx.body = {
+              code: 4,
+              username: result.username,
+              isLogin: true,
+              isAdmin: result.isAdmin,
+              msg: '邮箱未认证，请尽快前往认证！'
+            };
+          } else {
+            ctx.status = 200;
+            ctx.body = {
+              code: 1,
+              isLogin: true,
+              username: result.username,
+              isAdmin: result.isAdmin,
+              msg: '已登录'
+            };
+          }
+        }
+      }
     }
-
-    // let doc = await findUser(username);
-    // if (!doc) {
-    //   console.log('检查到用户名不存在');
-    //   ctx.status = 200;
-    //   ctx.body = {
-    //     info: false
-    //   }
-    // } else if (doc.password === password) {
-    //   console.log('密码一致!');
-
-    //   //生成一个新的token,并存到数据库
-    //   let token = createToken(username);
-    //   console.log(token);
-    //   doc.token = token;
-    //   await new Promise((resolve, reject) => {
-    //     doc.save((err) => {
-    //       if (err) {
-    //         reject(err);
-    //       }
-    //       resolve();
-    //     });
-    //   });
-
-    //   ctx.status = 200;
-    //   ctx.body = {
-    //     success: true,
-    //     username,
-    //     token, //登录成功要创建一个新的token,应该存入数据库
-    //     create_time: doc.create_time
-    //   };
-    // } else {
-    //   console.log('密码错误!');
-    //   ctx.status = 200;
-    //   ctx.body = {
-    //     success: false
-    //   };
-    // }
   };
-  // //用户退出(由前台控制即可)
-  // static async logout(ctx) {
-  //   ctx.success({
-  //     msg: '退出成功!',
-  //     success: true
-  //   });
-  // }
-  // //更新用户资料(到时再看看需要记录什么资料信息)
-  // static async updateUserMes(ctx) {
-  //   ctx.success({
-  //     msg: '通过!'
-  //   });
-  // }
-  // //重置密码
-  // static async resetPwd(ctx) {
-  //   const uid = ctx.request.body.id;
-  //   const password = md5(ctx.request.body.password);
-  //   await User
-  //     .findByIdAndUpdate(uid, {
-  //       password
-  //     })
-  //     .exec()
-  //     .catch(err => {
-  //       ctx.throw(500, '服务器内部错误-modifyPwd错误！');
-  //     });
-  //   ctx.success({
-  //     msg: '更改管理员密码成功!',
-  //     success: true
-  //   });
-  // }
 
   //注册账号
   static async register(ctx) {
@@ -231,7 +327,7 @@ class UserController {
             username: ctx.request.body.username,
             email: ctx.request.body.email,
             password, //加密
-            create_time: new Date()
+            createTime: new Date()
           });
           let result = await user
             .save()
@@ -239,14 +335,437 @@ class UserController {
               ctx.throw(500, 'register user error');
             });
           password = null;
-          console.log('a', password);
-          console.log('b', result._id);
           let token = createToken(result._id);
           ctx.status = 200;
           ctx.cookies.set('token', token);
           ctx.body = {
             code: 3,
             msg: '用户注册成功！'
+          };
+        }
+      }
+    }
+  };
+  //获取用户信息
+  static async getUserInfo(ctx) {
+    // checkToken已经把user写入ctx.request.user中
+    ctx.status = 200;
+    ctx.body = {
+      user_id: ctx.request.user._id,
+      username: ctx.request.user.username,
+      email: ctx.request.user.email,
+      emailConfirmation: ctx.request.user.emailConfirmation,
+      telephone: ctx.request.user.telephone,
+      qqNumber: ctx.request.user.qqNumber,
+      wechat: ctx.request.user.wechat,
+      message: ctx.request.user.message,
+      isDisabled: ctx.request.user.isDisabled,
+      createTime: ctx.request.user.createTime
+    };
+  };
+  // 修改用户信息
+  static async postUserInfo(ctx) {
+    //如果用户名修改了
+    if (ctx.request.user.username !== ctx.request.body.username) {
+      //如果用户名格式有误
+      if ((!/^(?!_)(?!.*?_$)[a-zA-Z0-9_\u4e00-\u9fa5]{4,20}$/.test(ctx.request.body.username)) || (/^[0-9]*$/.test(ctx.request.body.username)) || !ctx.request.body.username) {
+        ctx.status = 401;
+        ctx.body = {
+          code: 4,
+          msg: '用户名格式有误！'
+        };
+        return;
+      }
+    }
+    await User
+      .findByIdAndUpdate(ctx.request.user._id, {
+        username: ctx.request.body.username,
+        telephone: ctx.request.body.telephone,
+        qqNumber: ctx.request.body.qqNumber,
+        wechat: ctx.request.body.wechat,
+        message: ctx.request.body.message
+      })
+      .exec()
+      .catch(err => {
+        ctx.throw(500, 'write user info error');
+      });
+    ctx.status = 200;
+    ctx.body = {
+      code: 2,
+      msg: '用户信息修改成功'
+    };
+  };
+  // 重新发送验证邮件
+  static async resendEmail(ctx) {
+    // 如果已经通过验证
+    if (ctx.request.user.emailConfirmation) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '邮箱已通过验证'
+      };
+    } else {
+      sendEmail(ctx, ctx.request.user.email);
+    }
+  };
+  // 检查验证邮箱链接
+  static async checkEmailToken(ctx) {
+    // 不存在token
+    if (!ctx.request.body.token) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '验证有误，请重试'
+      };
+    } else {
+      let decoded;
+      try {
+        decoded = jwt.verify(ctx.request.body.token, config.emailJwt.secret);
+      } catch (err) {
+        // token不合法或过期
+        ctx.status = 401;
+        ctx.body = {
+          code: 6,
+          msg: '验证超时，请重新发起验证'
+        };
+        return;
+      }
+      if (decoded) {
+        // token合法
+        if (!decoded.email) {
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: 'token不包含邮箱地址，请与管理员联系'
+          };
+          return;
+        }
+        let result = await User
+          .findOne({
+            _id: decoded.user_id,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find user_id error');
+          });
+        if (!result) {
+          // 查找不到用户
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '用户不存在'
+          };
+          //找到用户
+        } else {
+          await User
+            .findByIdAndUpdate(decoded.user_id, {
+              emailConfirmation: true,
+              email: decoded.email
+            })
+            .exec()
+            .catch(err => {
+              ctx.theow(5000, 'write user info error');
+            });
+          ctx.status = 200;
+          ctx.body = {
+            code: 2,
+            email: decoded.email,
+            msg: '邮箱验证成功'
+          };
+        }
+      }
+    }
+  };
+  //修改密码
+  static async changePassword(ctx) {
+    // 原密码格式有误
+    if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(ctx.request.body.oldPassword) || !ctx.request.body.oldPassword) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '原密码格式有误！'
+      };
+    } else if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(ctx.request.body.newPassword) || !ctx.request.body.newPassword) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '新密码格式有误！'
+      };
+    } else if (ctx.request.body.oldPassword === ctx.request.body.newPassword) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '新密码不能与原密码相同！'
+      };
+    } else {
+      if (await bcrypt.compare(ctx.request.body.oldPassword, ctx.request.user.password)) {
+        //原密码正确
+        // 加密新密码
+        let password = await bcrypt.hash(ctx.request.body.newPassword, 12);
+        await User
+          .findByIdAndUpdate(ctx.request.user._id, {
+            password
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'write user password error');
+          });
+        ctx.status = 200;
+        ctx.body = {
+          code: 2,
+          msg: '密码修改成功'
+        };
+        password = null;
+      } else {
+        //原密码错误
+        ctx.status = 401;
+        ctx.body = {
+          code: 6,
+          msg: '原密码错误！'
+        };
+      }
+    }
+  };
+  // 修改邮箱
+  static async changeEmail(ctx) {
+    // 原密码格式有误
+    if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(ctx.request.body.password) || !ctx.request.body.password) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '密码格式有误！'
+      };
+    } else if (!/^[a-z0-9]+([._\\-]*[a-z0-9])*@([a-z0-9]+[-a-z0-9]*[a-z0-9]+.){1,63}[a-z0-9]+$/.test(ctx.request.body.email) || !ctx.request.body.email) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '邮箱格式有误！'
+      };
+      //如果密码格式有误
+    } else if (ctx.request.body.email === ctx.request.user.email) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '不能与原来的邮箱一样'
+      };
+      // 检查密码是否正确
+    } else if (await bcrypt.compare(ctx.request.body.password, ctx.request.user.password)) {
+      sendEmail(ctx, ctx.request.body.email);
+    }
+  }
+  // 忘记密码
+  static async forgetPassword(ctx) {
+    //如果账号格式有误
+    if (!(ctx.request.body.account && (/^(?!_)(?!.*?_$)[a-zA-Z0-9_\u4e00-\u9fa5]{4,20}$/.test(ctx.request.body.account) && !/^[0-9]*$/.test(ctx.request.body.account) || /^[a-z0-9]+([._\\-]*[a-z0-9])*@([a-z0-9]+[-a-z0-9]*[a-z0-9]+.){1,63}[a-z0-9]+$/.test(ctx.request.body.account)))) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '账号格式有误！'
+      };
+    } else {
+      let result;
+      //不包含“@”，即username
+      if (ctx.request.body.account.indexOf("@") === -1) {
+        result = await User
+          .findOne({
+            username: ctx.request.body.account,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find username error');
+          });
+        if (!result) {
+          //查找不到用户
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '用户不存在！'
+          };
+          return;
+        }
+      } else {
+        //含有“@”，即email
+        result = await User
+          .findOne({
+            email: ctx.request.body.account,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find email error');
+          });
+        if (!result) {
+          //查找不到用户
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '邮箱未注册！'
+          };
+          return;
+        }
+      }
+      // 找到用户
+      let link = config.resetPasswordFontLink + createEmailToken({ user_id: result._id });
+      let mailOptions = {
+        from: '"知识产权交易平台" <' + config.email.auth.user + '>',
+        to: result.email,
+        subject: '重置密码邮件',
+        // text: createEmailToken(ctx.request.user._id)
+        html: '<p>点击链接前往重置密码：<a href="' + link + '" target="_blank">点我验证<a></p><br/><p>如果链接无法点击请手动复制以下网址在浏览器中打开：</p></br><p>' + link + '</p><br/><p>注意：链接半小时内有效。</p>'
+      };
+      // console.log(mailOptions);
+      try {
+        await transporter.sendMail(mailOptions);
+      } catch (error) {
+        ctx.status = 401;
+        ctx.body = {
+          code: 6,
+          msg: '邮件发送失败，请稍后重试或与管理员联系'
+        };
+        console.log(error);
+        return;
+      }
+      ctx.status = 200;
+      ctx.body = {
+        code: 2,
+        msg: '邮件发送成功，请尽快前往重置密码'
+      };
+      // transporter.sendMail(mailOptions, (error, info) => {
+      //   if (error) {
+      //     ctx.status = 401;
+      //     ctx.body = {
+      //       code: 6,
+      //       msg: '邮件发送失败，请稍后重试或与管理员联系'
+      //     };
+      //     return console.log(error);
+      //   } else {
+      //     ctx.status = 200;
+      //     ctx.body = {
+      //       code: 2,
+      //       msg: '邮件发送成功，请尽快前往重置密码'
+      //     };
+      //   }
+      // });
+    }
+  }
+  // 重置密码（先检查token有效性）
+  static async resetPassword1(ctx) {
+    // 不存在token
+    if (!ctx.request.body.token) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '请求有误，请重试'
+      };
+    } else {
+      let decoded;
+      try {
+        decoded = jwt.verify(ctx.request.body.token, config.emailJwt.secret);
+      } catch (err) {
+        // token不合法或过期
+        ctx.status = 401;
+        ctx.body = {
+          code: 6,
+          msg: '重置密码超时，请重新发起'
+        };
+        return;
+      }
+      if (decoded) {
+        // token合法
+        let result = await User
+          .findOne({
+            _id: decoded.user_id,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find user_id error');
+          });
+        if (!result) {
+          // 查找不到用户
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '用户不存在'
+          };
+          //找到用户
+        } else {
+          ctx.status = 200;
+          ctx.body = {
+            code: 1,
+            email: result.email,
+            msg: 'token有效，进行下一步密码重置'
+          };
+        }
+      }
+    }
+  };
+  // 重置密码（再进行密码的输入）
+  static async resetPassword2(ctx) {
+    // 密码格式有误
+    if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,20}$/.test(ctx.request.body.password) || !ctx.request.body.password) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '密码格式有误！'
+      };
+      // 不存在token
+    } else if (!ctx.request.body.token) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '请求有误，请重试'
+      };
+    } else {
+      let decoded;
+      try {
+        decoded = jwt.verify(ctx.request.body.token, config.emailJwt.secret);
+      } catch (err) {
+        // token不合法或过期
+        ctx.status = 401;
+        ctx.body = {
+          code: 6,
+          msg: '重置密码超时，请重新发起'
+        };
+        return;
+      }
+      if (decoded) {
+        // token合法
+        let result = await User
+          .findOne({
+            _id: decoded.user_id,
+            isDelete: false
+          })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'find user_id error');
+          });
+        if (!result) {
+          // 查找不到用户
+          ctx.status = 401;
+          ctx.body = {
+            code: 6,
+            msg: '用户不存在'
+          };
+          //找到用户
+        } else {
+          // 加密新密码
+          let password = await bcrypt.hash(ctx.request.body.password, 12);
+          await User
+            .findByIdAndUpdate(decoded.user_id, {
+              password
+            })
+            .exec()
+            .catch(err => {
+              ctx.theow(5000, 'write user password error');
+            });
+          ctx.status = 200;
+          ctx.body = {
+            code: 2,
+            email: result.email,
+            msg: '密码修改成功'
           };
         }
       }
@@ -274,5 +793,4 @@ class UserController {
     };
   };
 };
-
 exports = module.exports = UserController;

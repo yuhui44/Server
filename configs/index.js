@@ -1,19 +1,31 @@
 // const fs = require('fs');
 
 let config = {
-  admin: {
-    username: 'admin',
-    password: 'admin',
-    name: 'sinner77'
+  // 验证邮箱邮件中的网址前缀
+  checkEmailFontLink: 'http://localhost:8080/valiEmail/',
+  // 重置密码邮件中的网址前缀
+  resetPasswordFontLink: 'http://localhost:8080/resetPass/',
+  // 发送邮件的账号
+  email: {
+    service: '163',
+    port: 465,
+    secureConnection: true,
+    auth: {
+      user: 'stuunet@163.com',
+      pass: 'scnustuu342'
+    }
   },
+  // 用于网页登录的token验证
   jwt: {
     secret: 'secret',
-    exprisesIn: '3600s'  //以秒为单位
+    exprisesIn: '12h'  //以秒为单位
   },
+  // 用于验证邮箱的token验证
   emailJwt: {
     secret: 'emailSecret',
     exprisesIn: '1800s'  //以秒为单位
   },
+  // mongoDB数据库配置
   mongodb: {
     host: '127.0.0.1',
     database: 'vue-login',
@@ -21,6 +33,7 @@ let config = {
     user: '',
     password: ''
   },
+  // 服务端接口配置
   app: {
     port: process.env.PORT || 8888,
     routerBaseApi: '/api'

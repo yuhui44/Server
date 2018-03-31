@@ -1,91 +1,55 @@
+// 检查token合法性与是否存在此用户
 const config = require('../configs');
+const User = require('../models/user.js');
 const jwt = require('jsonwebtoken');
 
-
 module.exports = async (ctx, next) => {
-    let token = ctx.cookies.get('token');
-    // const authorization = ctx.get('authorization');
-    if(token){
-        // let token = authorization.split(' ')[1];
-        try{
-            let decoded = jwt.verify(token, config.jwt.secret);
-            // console.log(decoded);返回如下
-            // { id: '5934afe7adb12d30f0679b41',
-            // iat: 1496629988,
-            // exp: 1496633588 } 解析后的exp=创建token的时间+之前设置的过期时间
-            // let deadline = new Date()/1000;
-            // if(decoded.exp <= deadline){
-            //     console.log('expired token');
-            //     ctx.throw(401, 'expired token');
-            // }else{
-            //     console.log('鉴权成功!');
-            //      await next();
-            // }
-        }catch(err){
-            ctx.throw(401, 'expired token');      //token验证失败
-        }
-    }else{
-        ctx.throw(401, 'no token detected in http header Authorization');         //缺少token
+  // 不存在token
+  if (!ctx.cookies.get('token')) {
+    ctx.status = 401;
+    ctx.body = {
+      code: 9,
+      msg: '未登录（不存在token）'
+    };
+    //存在token
+  } else {
+    let decoded;
+    try {
+      decoded = jwt.verify(ctx.cookies.get('token'), config.jwt.secret);
+    } catch (err) {
+      // token不合法或过期
+      ctx.status = 401;
+      ctx.body = {
+        code: 9,
+        msg: '未登录（token不合法）'
+      };
     }
-    await next();
+    if (decoded) {
+      // token合法
+      // console.log(decoded);
+      let result = await User
+        .findOne({
+          _id: decoded.user_id,
+          isDelete: false
+        })
+        .exec()
+        .catch(err => {
+          ctx.throw(500, 'find user_id error');
+        });
+      if (!result) {
+        //查找不到用户
+        ctx.status = 401;
+        ctx.body = {
+          code: 9,
+          msg: '未登录（用户不存在）'
+        };
+        //找到用户
+      } else {
+        //把用户数据写入请求体中
+        ctx.request.user = result;
+        // console.log(ctx.request.user);
+        await next();
+      }
+    }
+  }
 };
-
-
-// //检查token是否过期
-// module.exports = async ( ctx, next ) => {
-//     //拿到token
-    
-//     //console.log(ctx.request);的输出
-//         // { method: 'GET',
-//         // url: '/api/user',
-//         // header:
-//         // { 'accept-language': 'zh-CN,zh;q=0.8',
-//         //     'accept-encoding': 'gzip, deflate, sdch, br',
-//         //     referer: 'http://localhost:8000/',
-//         //     authorization: 'token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzMTIzMTIzIiwiaWF0IjoxNDk0NDA1MDg4LCJleHAiOjE0OTQ0MDUwODh9.57iy3sL9TG0MTXBS7Xr6SS0QGRZObrivUloy-25NBqg',
-//         //     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.98 Safari/537.36',
-//         //     accept: 'application/json, text/plain, */*',
-//         //     connection: 'close',
-//         //     host: 'localhost:8888' } }
-    
-//     if(ctx.request.header['authorization']){
-//         let token = ctx.request.header['authorization'].split(' ')[1];
-//         //解码token
-//         let decoded = jwt.decode(token, 'sinner77');
-//         //console.log(decoded);的输出 ：{ user_id: '123123123', iat: 1494405235, exp: 1494405235 }
-//         if(token && decoded.exp <= new Date()/1000){
-//             ctx.status = 401;
-//             ctx.body = {
-//                 message: 'token过期'
-//             };
-//         }else{
-//             //如果权限没问题，那么交个下一个控制器处理
-//             return next();
-//         }
-//     }else{
-//         ctx.status = 401;
-//         ctx.body = {
-//             message: '没有token'
-//         }
-//     }
-//     //看到这里请继续读完下面的代码
-// };
-
-// 上面的 jwt.decode(token, 'sinner77') 只是把信息解密出来，然后再验证是否还在有效期以内
-// 但是这个sinner77的参数是无效的，直接使用jwt.decode(token)或者jwt.decode(token, 'xxxx')
-// 解密出来的信息都是一致的，相当于没有对这个token进行是否合法的验证，达不到登录基本的安全性
-// 请使用下面的代码
-// module.exports = async ( ctx, next ) => {
-//     const authorization = ctx.get('Authorization');
-//     if (authorization === '') {
-//         ctx.throw(401, 'no token detected in http header 'Authorization'');
-//     }
-//     const token = authorization.split(' ')[1];
-//     let tokenContent;
-//     try {
-//         tokenContent = await jwt.verify(token, 'sinner77');     //如果token过期或验证失败，将抛出错误
-//     } catch (err) {
-//         ctx.throw(401, 'invalid token');
-//     }
-//     await next();
-// }

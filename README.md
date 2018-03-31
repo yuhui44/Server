@@ -9,3 +9,4 @@ code:
 6.error with message
 7.error with html message
 8.normal message
+9.error with message and login dialog 6
