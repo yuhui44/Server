@@ -21,7 +21,7 @@ router.get('/userStatus', UserController.userStatus);
 // 退出登录 请求：无 响应：无
 router.post('/logout', UserController.logout);
 //需要先检查权限的路由
-// 获取用户信息 请求：无 响应：user_id、username、email、telephone、qqNumber、wechat、emailConfirmation、isDisabled、createTime
+// 获取用户信息 请求：无 响应：user_id、username、email、telephone、qqNumber、wechat、message、emailConfirmation、isDisabled、createTime
 router.get('/userInfo', checkToken, UserController.getUserInfo);
 // 修改用户信息 请求：username、telephone、qqNumber、wechat、message
 router.post('/userInfo', checkToken, checkEmail, UserController.postUserInfo);

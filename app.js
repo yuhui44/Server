@@ -1,15 +1,6 @@
 const Koa = require('koa')
 const app = new Koa()
 
-// //response中间件
-// const response = require('./middlewares/response.js');
-// //try/catch中间件
-// const errorHandle = require('./middlewares/errorHandle.js');
-// //initAdmin中间件
-// const initAdmin = require('./middlewares/initAdmin.js');
-
-// const json = require('koa-json')
-
 //配置文件
 const config = require('./configs');
 
@@ -34,11 +25,6 @@ const bodyparser = require('koa-bodyparser');
 app.use(bodyparser({
   enableTypes:['json', 'form', 'text']
 }));
-
-// //使用response中间件(放在最前面)
-// app.use(response);
-
-// app.use(json())
 
 const logger = require('koa-logger');
 app.use(logger());

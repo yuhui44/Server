@@ -20,12 +20,9 @@
     "koa-onerror": "^1.2.1",
     "koa-router": "^7.1.1",
     "koa-static": "^3.0.0",
-    "moment": "^2.21.0",
     "mongoose": "^5.0.11",
     "nodemailer": "^4.6.3",
-    "objectid-to-timestamp": "^1.3.0",
     "pug": "^2.0.0-rc.1",
-    "sha1": "^1.1.1",
     "tracer": "^0.8.12"
   },
   "devDependencies": {
