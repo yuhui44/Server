@@ -351,6 +351,8 @@ class UserController {
     // checkToken已经把user写入ctx.request.user中
     ctx.status = 200;
     ctx.body = {
+      code: 1,
+      msg: '请求成功！',
       user_id: ctx.request.user._id,
       username: ctx.request.user.username,
       email: ctx.request.user.email,

@@ -24,7 +24,7 @@ router.post('/logout', UserController.logout);
 // 获取用户信息 请求：无 响应：user_id、username、email、telephone、qqNumber、wechat、message、emailConfirmation、isDisabled、createTime
 router.get('/userInfo', checkToken, UserController.getUserInfo);
 // 修改用户信息 请求：username、telephone、qqNumber、wechat、message
-router.post('/userInfo', checkToken, checkEmail, UserController.postUserInfo);
+router.post('/userInfo', checkToken, checkEmail, checkDisabled, UserController.postUserInfo);
 // 重新发送验证邮件 请求：无 
 router.get('/resendEmail', checkToken, UserController.resendEmail);
 // 对验证邮件链接进行验证 请求：token
