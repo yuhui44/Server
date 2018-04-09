@@ -50,40 +50,40 @@ const sendEmail = (ctx, email) => {
   };
 }
 
-//数据库的操作
-//根据用户名查找用户
-const findUser = (username) => {
-  return new Promise((resolve, reject) => {
-    User.findOne({ username }, (err, doc) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(doc);
-    });
-  });
-};
-//找到所有用户
-const findAllUsers = () => {
-  return new Promise((resolve, reject) => {
-    User.find({}, (err, doc) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(doc);
-    });
-  });
-};
-//删除某个用户
-const delUser = function (id) {
-  return new Promise((resolve, reject) => {
-    User.findOneAndRemove({ _id: id }, err => {
-      if (err) {
-        reject(err);
-      }
-      resolve();
-    });
-  });
-};
+// //数据库的操作
+// //根据用户名查找用户
+// const findUser = (username) => {
+//   return new Promise((resolve, reject) => {
+//     User.findOne({ username }, (err, doc) => {
+//       if (err) {
+//         reject(err);
+//       }
+//       resolve(doc);
+//     });
+//   });
+// };
+// //找到所有用户
+// const findAllUsers = () => {
+//   return new Promise((resolve, reject) => {
+//     User.find({}, (err, doc) => {
+//       if (err) {
+//         reject(err);
+//       }
+//       resolve(doc);
+//     });
+//   });
+// };
+// //删除某个用户
+// const delUser = function (id) {
+//   return new Promise((resolve, reject) => {
+//     User.findOneAndRemove({ _id: id }, err => {
+//       if (err) {
+//         reject(err);
+//       }
+//       resolve();
+//     });
+//   });
+// };
 
 class UserController {
   //用户登录(创建token)
@@ -367,35 +367,97 @@ class UserController {
   };
   // 修改用户信息
   static async postUserInfo(ctx) {
-    //如果用户名修改了
-    if (ctx.request.user.username !== ctx.request.body.username) {
-      //如果用户名格式有误
-      if ((!/^(?!_)(?!.*?_$)[a-zA-Z0-9_\u4e00-\u9fa5]{4,20}$/.test(ctx.request.body.username)) || (/^[0-9]*$/.test(ctx.request.body.username)) || !ctx.request.body.username) {
+    //如果用户名存在且格式有误
+    if ( (!/^(?![0-9]+$)(?!_)(?!.*?_$)[a-zAZ0-9_\u4e00-\u9fa5]{4,20}$/.test(ctx.request.body.username)) && ctx.request.body.username ) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 4,
+        msg: '用户名格式有误！'
+      };
+      return;
+    }
+    //如果邮箱存在且有误
+    if ((!/^[a-z0-9]+([._\\-]*[a-z0-9])*@([a-z0-9]+[-a-z0-9]*[a-z0-9]+.){1,63}[a-z0-9]+$/.test(ctx.request.body.email)) && ctx.request.body.email) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 4,
+        msg: '邮箱格式有误！'
+      };
+      return;
+    }
+    let userInfo = {};
+    if ( ctx.request.body.username ) {
+      userInfo.username = ctx.request.body.username;
+    }
+    if ( ctx.request.body.telephone ) {
+      userInfo.telephone = ctx.request.body.telephone;
+    }
+    if ( ctx.request.body.qqNumber ) {
+      userInfo.qqNumber = ctx.request.body.qqNumber;
+    }
+    if ( ctx.request.body.wechat ) {
+      userInfo.wechat = ctx.request.body.wechat;
+    }
+    if ( ctx.request.body.message ) {
+      userInfo.message = ctx.request.body.message;
+    }
+    // 如果不存在user_id，说明是普通用户
+    if (!ctx.request.body._id) {
+      await User
+        .findByIdAndUpdate(ctx.request.user._id, userInfo)
+        .exec()
+        .catch(err => {
+          ctx.throw(500, 'write user info error');
+        });
+      ctx.status = 200;
+      ctx.body = {
+        code: 2,
+        msg: '用户信息修改成功'
+      };
+    } else {
+      // 存在用户Id，执行管理员权限
+      if (!ctx.request.user.isAdmin) {
         ctx.status = 401;
         ctx.body = {
-          code: 4,
-          msg: '用户名格式有误！'
+          code: 6,
+          msg: '当前用户不是管理员'
         };
         return;
       }
+      if ( ctx.request.body.email ) {
+        userInfo.email = ctx.request.body.email;
+      }
+      if ( ctx.request.body.createTime ) {
+        userInfo.createTime = ctx.request.body.createTime;
+      }
+      if ( ctx.request.body.message ) {
+        userInfo.message = ctx.request.body.message;
+      }
+      if ( ctx.request.body.emailConfirmation ) {
+        userInfo.emailConfirmation = ctx.request.body.emailConfirmation;
+      }
+      if ( ctx.request.body.isAdmin ) {
+        userInfo.isAdmin = ctx.request.body.isAdmin;
+      }
+      // if ( ctx.request.body.isDisabled ) {
+      //   userInfo.isDisabled = ctx.request.body.isDisabled;
+      // }
+      if ( ctx.request.body.isDelete ) {
+        userInfo.isDelete = ctx.request.body.isDelete;
+      }
+      await User
+        .findByIdAndUpdate(ctx.request.body._id, userInfo)
+        .exec()
+        .catch(err => {
+          ctx.throw(500, 'write user info error');
+        });
+      ctx.status = 200;
+      ctx.body = {
+        code: 2,
+        msg: '用户信息修改成功'
+      };
+
     }
-    await User
-      .findByIdAndUpdate(ctx.request.user._id, {
-        username: ctx.request.body.username,
-        telephone: ctx.request.body.telephone,
-        qqNumber: ctx.request.body.qqNumber,
-        wechat: ctx.request.body.wechat,
-        message: ctx.request.body.message
-      })
-      .exec()
-      .catch(err => {
-        ctx.throw(500, 'write user info error');
-      });
-    ctx.status = 200;
-    ctx.body = {
-      code: 2,
-      msg: '用户信息修改成功'
-    };
   };
   // 重新发送验证邮件
   static async resendEmail(ctx) {
@@ -634,22 +696,6 @@ class UserController {
         code: 2,
         msg: '邮件发送成功，请尽快前往重置密码'
       };
-      // transporter.sendMail(mailOptions, (error, info) => {
-      //   if (error) {
-      //     ctx.status = 401;
-      //     ctx.body = {
-      //       code: 6,
-      //       msg: '邮件发送失败，请稍后重试或与管理员联系'
-      //     };
-      //     return console.log(error);
-      //   } else {
-      //     ctx.status = 200;
-      //     ctx.body = {
-      //       code: 2,
-      //       msg: '邮件发送成功，请尽快前往重置密码'
-      //     };
-      //   }
-      // });
     }
   }
   // 重置密码（先检查token有效性）
@@ -773,15 +819,31 @@ class UserController {
       }
     }
   };
-
   //获得所有用户信息
   static async getAllUsers(ctx) {
     //查询所有用户信息
-    let doc = await findAllUsers();
+    let doc = await User
+      .find({
+        isDelete: false
+      })
+      .select('message isAdmin emailConfirmation username email createTime isDisabled qqNumber telephone wechat')
+      .exec()
+      .catch(err => {
+        ctx.throw(500, 'find all users');
+      });
+    if (!doc) {
+      ctx.status = 401;
+      ctx.body = {
+        code: 6,
+        msg: '查找不到用户！'
+      };
+      return;
+    }
     ctx.status = 200;
     ctx.body = {
-      succsess: '成功',
-      result: doc
+      code: 1,
+      msg: '获取所有用户信息成功！',
+      users: doc
     };
   };
   //删除某个用户

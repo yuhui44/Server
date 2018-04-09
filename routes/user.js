@@ -39,7 +39,8 @@ router.post('/forgetPass', UserController.forgetPassword);
 router.post('/resetPass1', UserController.resetPassword1);
 // 重置密码2 请求：token、password
 router.post('/resetPass2', UserController.resetPassword2);
-// router.get('/user', checkToken, UserController.getAllUsers);
+// 获取所有用户信息
+router.get('/usersInfo', checkToken, checkAdmin, UserController.getAllUsers);
 // router.post('/delUser', checkToken, UserController.delUser);
 
 module.exports = router
