@@ -1,4 +1,5 @@
 const Property = require('../models/property.js');
+const User = require('../models/user.js');
 
 const UserController = require('../controllers/user.js');
 
@@ -24,7 +25,13 @@ class PropertyController {
           .catch(err => {
             ctx.throw(500, 'write new property error');
           });
-        await UserController.setUserAddProperty(ctx.request.user._id, result._id);
+        await User
+          .findByIdAndUpdate(ctx.request.user._id, { $push: { propertys: result._id } })
+          .exec()
+          .catch(err => {
+            ctx.throw(500, 'set user add property error');
+          });
+        // await UserController.setUserAddProperty(ctx.request.user._id, result._id);
         ctx.status = 200;
         ctx.body = {
           code: 2,
@@ -41,31 +48,34 @@ class PropertyController {
       // 存在产权id，编辑产权信息
     } else {
       let propertyInfo = {};
-      if ( ctx.request.body.propertyName ) {
+      if (ctx.request.body.propertyName) {
         propertyInfo.propertyName = ctx.request.body.propertyName;
       }
-      if ( ctx.request.body.summary ) {
+      if (ctx.request.body.summary) {
         propertyInfo.summary = ctx.request.body.summary;
       }
-      if ( ctx.request.body.detail ) {
+      if (ctx.request.body.detail) {
         propertyInfo.detail = ctx.request.body.detail;
       }
-      if ( ctx.request.body.isPublish !== null ) {
+      if (ctx.request.body.isPublish !== null) {
         propertyInfo.isPublish = ctx.request.body.isPublish;
       }
-      if ( ctx.request.body.isSelt !== null ) {
+      if (ctx.request.body.isSelt !== null) {
         propertyInfo.isSelt = ctx.request.body.isSelt;
       }
-      if ( ctx.request.user.isAdmin ) {
-        if ( ctx.request.body.isDisabled !== null ) {
+      if (ctx.request.user.isAdmin) {
+        if (ctx.request.body.isDisabled !== null) {
           propertyInfo.isDisabled = ctx.request.body.isDisabled;
         }
-        if ( ctx.request.body.createTime ) {
+        if (ctx.request.body.createTime) {
           propertyInfo.createTime = ctx.request.body.createTime;
         }
-        if ( ctx.request.body.editTime ) {
+        if (ctx.request.body.editTime) {
           propertyInfo.editTime = ctx.request.body.editTime;
         }
+      } else {
+        // 非管理员自动修改编辑时间
+        propertyInfo.editTime = new Date();
       }
       // 查找该ID
       let result = await Property
@@ -86,7 +96,15 @@ class PropertyController {
         };
         return;
       }
-      if ( ctx.request.user.isAdmin || ctx.request.user._id.equals( result.publisher ) ) {
+      if (result.isDisabled && !ctx.request.user.isAdmin) {
+        ctx.status = 401;
+        ctx.body = {
+          code: 6,
+          msg: '该产权信息已被管理员禁用，请与管理员取得联系！'
+        };
+        return;
+      }
+      if (ctx.request.user.isAdmin || ctx.request.user._id.equals(result.publisher)) {
         await Property
           .findByIdAndUpdate(ctx.request.body._id, propertyInfo)
           .exec()
@@ -108,20 +126,37 @@ class PropertyController {
       return;
     }
   };
+  //查询当前用户所有的产权信息
   static async getPropertys(ctx) {
-    //查询当前用户所有的产权信息
     let doc = await Property
       .find({
         publisher: ctx.request.user._id,
         isDelete: false
       })
-      .select('propertyName summary isPublish isSelt isDisable createTime editTime')
+      .select('propertyName summary isPublish isSelt isDisabled createTime editTime')
       .exec()
       .catch(err => {
         ctx.throw(500, 'find all propertys error');
       });
+    // let doc = await User
+    //   .findOne({
+    //     _id: ctx.request.user._id,
+    //     isDelete: false
+    //   })
+    //   .populate({
+    //     path: 'propertys',
+    //     match: {
+    //       isDelete: false
+    //     },
+    //     select: 'propertyName summary isPublish isSelt isDisable createTime editTime'
+    //   })
+    //   .select('propertys')
+    //   .exec()
+    //   .catch(err => {
+    //     ctx.throw(500, 'find all propertys error');
+    //   });
     if (!doc) {
-      ctx.status = 401;
+      ctx.status = 200;
       ctx.body = {
         code: 4,
         msg: '当前未发布产权！'
@@ -154,12 +189,11 @@ class PropertyController {
           _id: ctx.request.query._id,
           isDelete: false
         })
-        .populate({
-          path: 'publisherName',
-          match: { 'isDelete': false },
-          select: '-isDelete'
-        })
-        .select('propertyName summary detail publisher isPublish isSelt isDisable createTime editTime publisherName')
+        // .populate({
+        //   path: 'publisher',
+        //   select: 'username email'
+        // })
+        .select('propertyName summary detail isPublish isSelt isDisabled createTime editTime')
         .exec()
         .catch(err => {
           ctx.throw(500, 'find property_id error');
@@ -185,7 +219,8 @@ class PropertyController {
       let result = await Property
         .findOne({
           _id: ctx.request.query._id,
-          isDelete: false
+          isDelete: false,
+          publisher: ctx.request.user._id
         })
         .select('propertyName summary detail isPublish isSelt publisher')
         .exec()
@@ -201,15 +236,6 @@ class PropertyController {
         };
         return;
       }
-      // 产权所有者非请求者
-      if ( ! result.publisher.equals( ctx.request.user._id ) ) {
-        ctx.status = 401;
-        ctx.body = {
-          code: 6,
-          msg: '不可获取他人产权信息！'
-        };
-        return;
-      }
       ctx.status = 200;
       ctx.body = {
         code: 1,
@@ -219,5 +245,36 @@ class PropertyController {
       return;
     }
   };
+  // 管理员获取所有用户的产权信息
+  static async getAllPropertys(ctx) {
+    let doc = await Property
+      .find({
+        // publisher: ctx.request.user._id,
+        isDelete: false
+      })
+      .populate({
+        path: 'publisher',
+        select: 'username email'
+      })
+      .select('propertyName summary isPublish isSelt isDisable createTime editTime publisher')
+      .exec()
+      .catch(err => {
+        ctx.throw(500, 'find all propertys error');
+      });
+    if (!doc) {
+      ctx.status = 200;
+      ctx.body = {
+        code: 4,
+        msg: '当前未发布产权！'
+      };
+      return;
+    }
+    ctx.status = 200;
+    ctx.body = {
+      code: 1,
+      msg: '获取所有产权信息成功！',
+      propertys: doc
+    };
+  };
 };
-exports = module.exports = PropertyController;
+  exports = module.exports = PropertyController;

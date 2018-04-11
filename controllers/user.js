@@ -842,15 +842,15 @@ class UserController {
       users: doc
     };
   };
-  // 为用户增加产权
-  static async setUserAddProperty(id, propertyId) {
-    return await User
-      .findByIdAndUpdate(id, { $push: { propertys: propertyId }})
-      .exec()
-      .catch(err => {
-        ctx.throw(500, 'set user add property error');
-      });
-  }
+  // // 为用户增加产权
+  // static async setUserAddProperty(id, propertyId) {
+  //   return await User
+  //     .findByIdAndUpdate(id, { $push: { propertys: propertyId }})
+  //     .exec()
+  //     .catch(err => {
+  //       ctx.throw(500, 'set user add property error');
+  //     });
+  // }
   // //删除某个用户
   // static async delUser(ctx) {
   //   //拿到要删除的用户id

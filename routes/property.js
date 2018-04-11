@@ -14,10 +14,13 @@ const PropertyController = require('../controllers/property.js');
 
 // 新建或编辑产权信息 请求：_id（编辑）、propertyName、summary、detail、isPublish、isSelt、isDisabled、createTime、editTime
 router.post('/property', checkToken, checkEmail, checkDisabled, PropertyController.postProperty);
-// 获取产权信息详情
+// 获取产权信息详情 请求：_id
 router.get('/property', checkToken, PropertyController.getProperty);
 // 获取产权信息列表
 router.get('/propertys', checkToken, PropertyController.getPropertys);
+// 管理员获取所有产权信息列表
+router.get('/allPropertys', checkToken, checkEmail, checkDisabled, checkAdmin, PropertyController.getAllPropertys);
+// 首页获取产权列表
 // // 登录状态 请求：无 响应：isLogin、isAdmin、username
 // router.get('/userStatus', UserController.userStatus);
 // // 退出登录 请求：无 响应：无
