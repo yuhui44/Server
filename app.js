@@ -35,10 +35,10 @@ app.use(logger());
 // app.use(errorHandle);
 
 // routes
-// const index = require('./routes/index')
+const property = require('./routes/property')
 const user = require('./routes/user');
-// app.use(index.routes(), index.allowedMethods());
-app.use( user.routes(), user.allowedMethods());
+app.use(property.routes(), property.allowedMethods());
+app.use(user.routes(), user.allowedMethods());
 
 // // error-handling
 // app.on('error', (err, ctx) => {

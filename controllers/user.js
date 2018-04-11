@@ -8,7 +8,7 @@ let transporter = nodemailer.createTransport(config.email);
 
 //创建Token
 const jwt = require('jsonwebtoken');
-const createToken = user_id => {
+const createToken = async (user_id) => {
   let token = jwt.sign({
     user_id
   }, config.jwt.secret, {
@@ -16,15 +16,15 @@ const createToken = user_id => {
     });
   return token;
 };
-const createEmailToken = (decoded) => {
+const createEmailToken = async (decoded) => {
   let token = jwt.sign(decoded, config.emailJwt.secret, {
     expiresIn: config.emailJwt.exprisesIn
   });
   return token;
 }
 // 发送验证邮箱邮件
-const sendEmail = (ctx, email) => {
-  let link = config.checkEmailFontLink + createEmailToken({ user_id: ctx.request.user._id, email });
+const sendEmail = async (ctx, email) => {
+  let link = config.checkEmailFontLink + await createEmailToken({ user_id: ctx.request.user._id, email });
   let mailOptions = {
     from: '"知识产权交易平台" <' + config.email.auth.user + '>',
     to: ctx.request.user.email,
@@ -127,7 +127,7 @@ class UserController {
           //找到用户
           if (await bcrypt.compare(ctx.request.body.password, result.password)) {
             //密码正确
-            let token = createToken(result._id);
+            let token = await createToken(result._id);
             ctx.status = 200;
             ctx.cookies.set('token', token);
             ctx.body = {
@@ -165,7 +165,7 @@ class UserController {
           //找到用户
           if (await bcrypt.compare(ctx.request.body.password, result.password)) {
             //密码正确
-            let token = createToken(result._id);
+            let token = await createToken(result._id);
             ctx.status = 200;
             ctx.cookies.set('token', token);
             ctx.body = {
@@ -335,11 +335,11 @@ class UserController {
               ctx.throw(500, 'register user error');
             });
           password = null;
-          let token = createToken(result._id);
+          let token = await createToken(result._id);
           ctx.status = 200;
           ctx.cookies.set('token', token);
           ctx.body = {
-            code: 3,
+            code: 2,
             msg: '用户注册成功！'
           };
         }
@@ -398,7 +398,7 @@ class UserController {
     if ( ctx.request.body.wechat ) {
       userInfo.wechat = ctx.request.body.wechat;
     }
-    if ( ctx.request.body.message ) {
+    if ( ctx.request.body.message !== null ) {
       userInfo.message = ctx.request.body.message;
     }
     // 如果不存在user_id，说明是普通用户
@@ -430,21 +430,18 @@ class UserController {
       if ( ctx.request.body.createTime ) {
         userInfo.createTime = ctx.request.body.createTime;
       }
-      if ( ctx.request.body.message ) {
-        userInfo.message = ctx.request.body.message;
-      }
-      if ( ctx.request.body.emailConfirmation ) {
+      if ( ctx.request.body.emailConfirmation !== null ) {
         userInfo.emailConfirmation = ctx.request.body.emailConfirmation;
       }
-      if ( ctx.request.body.isAdmin ) {
+      if ( ctx.request.body.isAdmin !== null ) {
         userInfo.isAdmin = ctx.request.body.isAdmin;
       }
-      // if ( ctx.request.body.isDisabled ) {
-      //   userInfo.isDisabled = ctx.request.body.isDisabled;
-      // }
-      if ( ctx.request.body.isDelete ) {
-        userInfo.isDelete = ctx.request.body.isDelete;
+      if ( ctx.request.body.isDisabled !== null ) {
+        userInfo.isDisabled = ctx.request.body.isDisabled;
       }
+      // if ( ctx.request.body.isDelete !==null ) {
+      //   userInfo.isDelete = ctx.request.body.isDelete;
+      // }
       await User
         .findByIdAndUpdate(ctx.request.body._id, userInfo)
         .exec()
@@ -456,7 +453,6 @@ class UserController {
         code: 2,
         msg: '用户信息修改成功'
       };
-
     }
   };
   // 重新发送验证邮件
@@ -469,7 +465,7 @@ class UserController {
         msg: '邮箱已通过验证'
       };
     } else {
-      sendEmail(ctx, ctx.request.user.email);
+      await sendEmail(ctx, ctx.request.user.email);
     }
   };
   // 检查验证邮箱链接
@@ -615,7 +611,7 @@ class UserController {
       };
       // 检查密码是否正确
     } else if (await bcrypt.compare(ctx.request.body.password, ctx.request.user.password)) {
-      sendEmail(ctx, ctx.request.body.email);
+      await sendEmail(ctx, ctx.request.body.email);
     }
   }
   // 忘记密码
@@ -671,7 +667,7 @@ class UserController {
         }
       }
       // 找到用户
-      let link = config.resetPasswordFontLink + createEmailToken({ user_id: result._id });
+      let link = config.resetPasswordFontLink + await createEmailToken({ user_id: result._id });
       let mailOptions = {
         from: '"知识产权交易平台" <' + config.email.auth.user + '>',
         to: result.email,
@@ -829,7 +825,7 @@ class UserController {
       .select('message isAdmin emailConfirmation username email createTime isDisabled qqNumber telephone wechat')
       .exec()
       .catch(err => {
-        ctx.throw(500, 'find all users');
+        ctx.throw(500, 'find all users error');
       });
     if (!doc) {
       ctx.status = 401;
@@ -846,15 +842,24 @@ class UserController {
       users: doc
     };
   };
-  //删除某个用户
-  static async delUser(ctx) {
-    //拿到要删除的用户id
-    let id = ctx.request.body.id;
-    await delUser(id);
-    ctx.status = 200;
-    ctx.body = {
-      success: '删除成功'
-    };
-  };
+  // 为用户增加产权
+  static async setUserAddProperty(id, propertyId) {
+    return await User
+      .findByIdAndUpdate(id, { $push: { propertys: propertyId }})
+      .exec()
+      .catch(err => {
+        ctx.throw(500, 'set user add property error');
+      });
+  }
+  // //删除某个用户
+  // static async delUser(ctx) {
+  //   //拿到要删除的用户id
+  //   let id = ctx.request.body.id;
+  //   await delUser(id);
+  //   ctx.status = 200;
+  //   ctx.body = {
+  //     success: '删除成功'
+  //   };
+  // };
 };
 exports = module.exports = UserController;

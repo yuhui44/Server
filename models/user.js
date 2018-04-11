@@ -8,7 +8,7 @@ const userSchema = new Schema({
   telephone: String,
   qqNumber: String,
   wechat: String,
-  message: {type: Boolean, default: false},
+  message: {type: Boolean, default: true},
   isAdmin: {type: Boolean, default: false},
   emailConfirmation: {type: Boolean, default: false},
   isDisabled: {type: Boolean, default: false},

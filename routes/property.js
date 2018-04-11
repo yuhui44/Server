@@ -12,10 +12,12 @@ const PropertyController = require('../controllers/property.js');
 
 // 响应默认带有code、msg
 
-// 新建或编辑产权信息 请求：_id（编辑）、propertyName、summary、detail、is
+// 新建或编辑产权信息 请求：_id（编辑）、propertyName、summary、detail、isPublish、isSelt、isDisabled、createTime、editTime
 router.post('/property', checkToken, checkEmail, checkDisabled, PropertyController.postProperty);
-// // 用户注册 请求：username、email、password
-// router.post('/register', UserController.register);
+// 获取产权信息详情
+router.get('/property', checkToken, PropertyController.getProperty);
+// 获取产权信息列表
+router.get('/propertys', checkToken, PropertyController.getPropertys);
 // // 登录状态 请求：无 响应：isLogin、isAdmin、username
 // router.get('/userStatus', UserController.userStatus);
 // // 退出登录 请求：无 响应：无
