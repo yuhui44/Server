@@ -276,5 +276,38 @@ class PropertyController {
       propertys: doc
     };
   };
+  // 获取首页产权列表
+  static async indexPropertys(ctx) {
+    let doc = await Property
+      .find({
+        isDelete: false,
+        isDisabled: false,
+        isPublish: true,
+        isSelt: false
+      })
+      .populate({
+        path: 'publisher',
+        select: 'username'
+      })
+      .select('propertyName summary createTime publisher')
+      .exec()
+      .catch(err => {
+        ctx.throw(500, 'find propertys error');
+      });
+    if (!doc) {
+      ctx.status = 200;
+      ctx.body = {
+        code: 4,
+        msg: '当前未发布产权！'
+      };
+      return;
+    }
+    ctx.status = 200;
+    ctx.body = {
+      code: 1,
+      msg: '获取首页产权列表成功',
+      propertys: doc
+    }
+  }
 };
   exports = module.exports = PropertyController;

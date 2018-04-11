@@ -21,6 +21,7 @@ router.get('/propertys', checkToken, PropertyController.getPropertys);
 // 管理员获取所有产权信息列表
 router.get('/allPropertys', checkToken, checkEmail, checkDisabled, checkAdmin, PropertyController.getAllPropertys);
 // 首页获取产权列表
+router.get('/indexPropertys', PropertyController.indexPropertys);
 // // 登录状态 请求：无 响应：isLogin、isAdmin、username
 // router.get('/userStatus', UserController.userStatus);
 // // 退出登录 请求：无 响应：无
