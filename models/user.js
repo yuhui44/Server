@@ -14,7 +14,7 @@ const userSchema = new Schema({
   isDisabled: {type: Boolean, default: false},
   isDelete: {type: Boolean, default: false},
   createTime: {type: Date, default: Date.now},
-  propertys: [{type: Schema.Types.ObjectId, ref:'property'}]
+  // propertys: [{type: Schema.Types.ObjectId, ref:'property'}]
 });
 
 exports = module.exports = mongoose.model('user', userSchema);

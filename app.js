@@ -37,8 +37,10 @@ app.use(logger());
 // routes
 const property = require('./routes/property')
 const user = require('./routes/user');
+const want = require('./routes/want');
 app.use(property.routes(), property.allowedMethods());
 app.use(user.routes(), user.allowedMethods());
+app.use(want.routes(), want.allowedMethods());
 
 // // error-handling
 // app.on('error', (err, ctx) => {

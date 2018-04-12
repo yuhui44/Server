@@ -22,31 +22,6 @@ router.get('/propertys', checkToken, PropertyController.getPropertys);
 router.get('/allPropertys', checkToken, checkEmail, checkDisabled, checkAdmin, PropertyController.getAllPropertys);
 // 首页获取产权列表
 router.get('/indexPropertys', PropertyController.indexPropertys);
-// // 登录状态 请求：无 响应：isLogin、isAdmin、username
-// router.get('/userStatus', UserController.userStatus);
-// // 退出登录 请求：无 响应：无
-// router.post('/logout', UserController.logout);
-// //需要先检查权限的路由
-// // 获取用户信息 请求：无 响应：user_id、username、email、telephone、qqNumber、wechat、message、emailConfirmation、isDisabled、createTime
-// router.get('/userInfo', checkToken, UserController.getUserInfo);
-// // 修改用户信息 请求：username、telephone、qqNumber、wechat、message
-// router.post('/userInfo', checkToken, checkEmail, checkDisabled, UserController.postUserInfo);
-// // 重新发送验证邮件 请求：无 
-// router.get('/resendEmail', checkToken, UserController.resendEmail);
-// // 对验证邮件链接进行验证 请求：token
-// router.post('/checkEmailToken', UserController.checkEmailToken);
-// // 修改密码
-// router.post('/changePass', checkToken, UserController.changePassword);
-// // 修改邮箱
-// router.post('/changeEmail', checkToken, UserController.changeEmail);
-// // 忘记密码 请求：email
-// router.post('/forgetPass', UserController.forgetPassword);
-// // 重置密码1 请求：token
-// router.post('/resetPass1', UserController.resetPassword1);
-// // 重置密码2 请求：token、password
-// router.post('/resetPass2', UserController.resetPassword2);
-// // 获取所有用户信息
-// router.get('/usersInfo', checkToken, checkAdmin, UserController.getAllUsers);
-// router.post('/delUser', checkToken, UserController.delUser);
-
+// 首页获取产权详情 参数：_id
+router.get('/indexProperty', PropertyController.indexProperty);
 module.exports = router
