@@ -19,7 +19,7 @@ router.get('/property', checkToken, PropertyController.getProperty);
 // 获取产权信息列表
 router.get('/propertys', checkToken, PropertyController.getPropertys);
 // 管理员获取所有产权信息列表
-router.get('/allPropertys', checkToken, checkEmail, checkDisabled, checkAdmin, PropertyController.getAllPropertys);
+router.get('/allPropertys', checkToken, checkAdmin, PropertyController.getAllPropertys);
 // 首页获取产权列表
 router.get('/indexPropertys', PropertyController.indexPropertys);
 // 首页获取产权详情 参数：_id

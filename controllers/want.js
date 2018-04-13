@@ -317,7 +317,7 @@ class WantController {
           select: 'propertyName isSelt isDisabled isPublish'
         }
       ])
-      .select('message keeper property createTime')
+      .select('message keeper wanter property createTime')
       .exec()
       .catch(err => {
         ctx.throw(500, 'find all propertys error');
