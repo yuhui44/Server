@@ -29,7 +29,7 @@ app.use(bodyparser({
 const logger = require('koa-logger');
 app.use(logger());
 
-// app.use(require('koa-static')(__dirname + '/public'));
+app.use(require('koa-static')(__dirname + '/public'));
 
 // //使用errorHandle中间件
 // app.use(errorHandle);
@@ -46,5 +46,13 @@ app.use(want.routes(), want.allowedMethods());
 // app.on('error', (err, ctx) => {
 //   console.error('server error', err, ctx)
 // });
+
+// 404
+app.use(async (ctx) => {
+    ctx.status = 200;
+    ctx.type = 'html';
+    ctx.body = require('fs').createReadStream(__dirname + '/public/index.html');
+  })
+
 
 module.exports = app

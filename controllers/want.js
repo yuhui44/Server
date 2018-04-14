@@ -1,5 +1,25 @@
 const Want = require('../models/want.js');
 const Property = require('../models/property.js');
+const config = require('../configs');
+
+// 配置邮件服务器
+const nodemailer = require('nodemailer');
+let transporter = nodemailer.createTransport(config.email);
+
+// 发送意向消息邮件 参数：接收者邮箱 接收者用户名 发送者用户名 发送者邮箱 发送者留言
+const sendEmail = async (toEmail, toUsername, fromEmail, fromUsername, message, propertyName) => {
+  let mailOptions = {
+    from: '"知识产权交易平台" <' + config.email.auth.user + '>',
+    to: toEmail,
+    subject: '“' + propertyName + '”有新的意向消息！',
+    html: '<p>' + toUsername + '：</p><p>　　您的知识产权“' + propertyName + '”接收到了来自“' + fromUsername + '”用户的意向信息，留言信息为：“' + message + '”，它的邮箱为：“' + fromEmail + '”，请及时与对方取得联系。更多详细信息请登录个人中心查看：<a href="' + config.myPropertysLink + '" target="_blank">我的转让<a>。</p><p style="text-align: right;">知识产权交易平台</p>' 
+  };
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log(error);
+    }
+  });
+}
 
 class WantController {
   static async postWant(ctx) {
@@ -39,7 +59,11 @@ class WantController {
         isSelt: false,
         isDisabled: false
       })
-      // .select('propertyName summary detail isPublish isSelt publisher')
+      .populate({
+        path: 'publisher',
+        select: 'email username'
+      })
+      .select('publisher propertyName')
       .exec()
       .catch(err => {
         ctx.throw(500, 'find property_id error');
@@ -99,7 +123,10 @@ class WantController {
       msg: '请求意向提交成功！'
     };
     // 向产权所有者发送邮件
+    // console.log(ctx.request.user);
+    await sendEmail( result.publisher.email, result.publisher.username, ctx.request.user.email, ctx.request.user.username, ctx.request.body.message, result.propertyName );
   };
+
   // 查询产权的意向情况 俩功能：一、查询所有接收到的产权 二、查询某产权接收到的意向
   static async getWants(ctx) {
     // 为管理员提供特殊的存在id的意向查询方法

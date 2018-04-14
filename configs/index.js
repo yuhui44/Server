@@ -5,6 +5,8 @@ let config = {
   checkEmailFontLink: 'http://localhost:8080/valiEmail/',
   // 重置密码邮件中的网址前缀
   resetPasswordFontLink: 'http://localhost:8080/resetPass/',
+  // 用户个人中心-我的转让网站
+  myPropertysLink: 'http://localhost:8080/user/property',
   // 发送邮件的账号
   email: {
     service: '163',

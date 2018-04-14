@@ -30,7 +30,7 @@ const sendEmail = async (ctx, email) => {
     to: ctx.request.user.email,
     subject: '验证邮箱邮件',
     // text: createEmailToken(ctx.request.user._id)
-    html: '<p>点击链接验证当前邮箱：<a href="' + link + '" target="_blank">点我验证<a></p><br/><p>如果链接无法点击请手动复制以下网址在浏览器中打开：</p></br><p>' + link + '</p><br/><p>注意：链接半小时内有效。</p>'
+    html: '<p>点击链接验证当前邮箱：<a href="' + link + '" target="_blank">点我验证<a></p><p>如果链接无法点击请手动复制以下网址在浏览器中打开：</p><p>' + link + '</p><p>注意：链接半小时内有效。</p><p style="text-align: right;">知识产权交易平台</p>'
   };
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
