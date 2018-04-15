@@ -1,12 +1,17 @@
 // const fs = require('fs');
 
+
+  // 网站网址
+  let webLink = 'http://192.168.10.11';
+  // let webLink = 'http://localhost';
+
 let config = {
   // 验证邮箱邮件中的网址前缀
-  checkEmailFontLink: 'http://localhost/valiEmail/',
+  checkEmailFontLink: webLink + '/valiEmail/',
   // 重置密码邮件中的网址前缀
-  resetPasswordFontLink: 'http://localhost/resetPass/',
+  resetPasswordFontLink: webLink + '/resetPass/',
   // 用户个人中心-我的转让网站
-  myPropertysLink: 'http://localhost/user/property',
+  myPropertysLink: webLink + '/user/property',
   // 发送邮件的账号
   email: {
     service: '163',
