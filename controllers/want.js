@@ -61,7 +61,7 @@ class WantController {
       })
       .populate({
         path: 'publisher',
-        select: 'email username'
+        select: 'email username message'
       })
       .select('publisher propertyName')
       .exec()
@@ -123,8 +123,9 @@ class WantController {
       msg: '请求意向提交成功！'
     };
     // 向产权所有者发送邮件
-    // console.log(ctx.request.user);
-    await sendEmail( result.publisher.email, result.publisher.username, ctx.request.user.email, ctx.request.user.username, ctx.request.body.message, result.propertyName );
+    if ( result.publisher.message ) {
+      await sendEmail( result.publisher.email, result.publisher.username, ctx.request.user.email, ctx.request.user.username, ctx.request.body.message, result.propertyName );
+    }
   };
 
   // 查询产权的意向情况 俩功能：一、查询所有接收到的产权 二、查询某产权接收到的意向

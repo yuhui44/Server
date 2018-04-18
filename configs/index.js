@@ -42,7 +42,7 @@ let config = {
   },
   // 服务端接口配置
   app: {
-    port: process.env.PORT || 80,
+    port: process.env.PORT || 8888,
     routerBaseApi: '/api'
   }
 };
